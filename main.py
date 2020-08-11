@@ -52,7 +52,7 @@ def download_images():
     print('Start searching...')
 
     #searchurl = GOOGLE_IMAGE + 'q=' + data
-    searchurl = YANDEX_IMAGE + data.strip()
+    searchurl = YANDEX_IMAGE + data.strip().replace(' ','%20')
     print('Search URL: ',searchurl)
 
     #response = requests.get(searchurl, headers=usr_agent)

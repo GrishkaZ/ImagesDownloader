@@ -9,6 +9,12 @@ from bs4 import BeautifulSoup  # to parse HTML
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
+from enum import Enum
+
+class Extension(Enum):
+    PNG = 'png'
+    JPG = 'jpg'
+
 
 
 GOOGLE_IMAGE = \
@@ -43,14 +49,14 @@ def main():
     download_images()
 
 
-# Download Page for more than 30 images
+# Download Page for more than 30 images (based on code from "google-images-download")
 def download_extended_page(url):
     options = webdriver.ChromeOptions()
     options.add_argument('--no-sandbox')
     options.add_argument("--headless")
 
     try:
-        browser = webdriver.Chrome(CHROME_DRIVER, chrome_options=options)
+        browser = webdriver.Chrome(options=options)
     except Exception as e:
         print("Looks like Chromedriver does not exist. Perhaps directory is specified not correctly. (exception: %s)" % e)
         sys.exit()
@@ -72,6 +78,7 @@ def download_extended_page(url):
         for i in range(50):
             element.send_keys(Keys.PAGE_DOWN)
             time.sleep(0.3)  # bot id protection
+            print('!' * 60)
     except:
         for i in range(10):
             element.send_keys(Keys.PAGE_DOWN)
@@ -86,69 +93,117 @@ def download_extended_page(url):
 
     return source
 
+def get_raw_html_page(request_string, n_images, se = 'Yandex'):
+
+    # searchurl = GOOGLE_IMAGE + 'q=' + data
+    searchurl = YANDEX_IMAGE + request_string.strip().replace(' ', '%20')
+    print('Search URL: ', searchurl)
+
+    # html = requests.get(searchurl, headers=usr_agent).text
+
+    if n_images > 30:
+        return download_extended_page(searchurl)
+    else:
+        return requests.get(searchurl).text
+
+
+def extract_images_urls(html, n_images, max_wh, min_wh):
+    min_w = int(min_wh[0])
+    min_h = int(min_wh[1])
+    max_w = int(max_wh[0])
+    max_h = int(max_wh[1])
+
+
+
+    soup = BeautifulSoup(html, 'html.parser')
+    # print(soup.prettify())
+
+    #find images-tegs
+    results = soup.findAll('div',
+                           {'class': re.compile(
+                               'serp-item serp-item_type_search serp-item_group_search serp-item_pos_\d+ serp-item_scale_yes justifier__item i-bem')},
+                           limit=n_images)
+
+    #extract images urls from tegs
+    images_urls = []
+    for teg in results:
+        try:
+            text = teg['data-bem']
+        except KeyError as e:
+            print(e)
+            print(teg)
+            continue
+        text_dict = json.loads(text)
+        try:
+            images_dict = text_dict['serp-item']['preview']
+            for i in range(len(images_dict)):
+                #print(i)
+                width = images_dict[i]['origin']['w']
+                height = images_dict[i]['origin']['h']
+                #print(f'width {width}, height {height}')
+                if (min_w < width) & (width < max_w) & (min_h < height) & (height< max_h):
+                    link = images_dict[i]['origin']['url']
+                    images_urls.append(link)
+                    break
+                """
+                link = text_dict['serp-item']['preview'][0]['origin']['url']
+                width = text_dict['serp-item']['preview'][0]['origin']['w']
+                height = text_dict['serp-item']['preview'][0]['origin']['h']
+                # print(f'width {width}, height {height}')
+                images_urls.append(link)
+                """
+        except KeyError as e:
+            print(e)
+            print(text_dict)
+            continue
+    return images_urls
+
+def write_images(images_urls, img_name, extension = None):
+    #func for making file image names
+    make_imagename = make_file_name_func(extension)
+
+    img_count = len(images_urls)
+    print(f'found {img_count} images')
+    print('Start downloading...')
+
+    errors_count = 0
+    for i, img_url in tqdm(enumerate(images_urls), desc='Downloaded'):
+        try:
+            # print(img_url)
+            response = requests.get(img_url)
+            file_name = SAVE_FOLDER + '/' + img_name + ' ' + str(i + 1)
+            imagename = make_imagename(file_name,img_url)
+            with open(imagename, 'wb') as file:
+                file.write(response.content)
+        except Exception as e:
+            errors_count += 1
+            # exc_type, exc_value, exc_traceback = sys.exc_info()
+            # traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
+            print('\nImage wasn\'t downloaded: Exception %s' % e)
+            continue
+    print(f'Downloaded {img_count - errors_count}/{img_count} images')
+
+def make_file_name_func(extension):
+    if extension:
+        if (extension == Extension):
+            raise TypeError('extension must belongs to enum Extension')
+        return lambda *args: args[0] + '.' + extension.value
+    else:
+        #split img url and take it's extension
+        return lambda *args: args[0] + '.' + args[1].split('.')[-1]
 
 
 
 def download_images():
     # ask for user input
-    data = input('What are you looking for? ')
+    request_string = input('What are you looking for? ')
     n_images = int(input('How many images do you want? '))
-    #max_wh = list(input('How max size? (w,h)'))
-    #min_wh = list(input('How min size? (w,h)'))
-
+    max_wh = input('How max size? (w,h)').split()
+    min_wh = input('How min size? (w,h)').split()
     print('Start searching...')
-
-    #searchurl = GOOGLE_IMAGE + 'q=' + data
-    searchurl = YANDEX_IMAGE + data.strip().replace(' ','%20')
-    print('Search URL: ',searchurl)
-
-    #response = requests.get(searchurl, headers=usr_agent)
-    if n_images >30:
-        html = download_extended_page(searchurl)
-    else:
-        html = requests.get(searchurl).text
-
-    soup = BeautifulSoup(html, 'html.parser')
-    #print(soup.prettify())
-
-    results = soup.findAll('div',{'class':re.compile('serp-item serp-item_type_search serp-item_group_search serp-item_pos_\d+ serp-item_scale_yes justifier__item i-bem')},limit=n_images)
-
-    #'class':"serp-item serp-item_type_search serp-item_group_search serp-item_pos_1 serp-item_scale_yes justifier__item i-bem"
-
-    imagelinks = []
-    for teg in results:
-        try:
-            text = teg['data-bem']
-        except(KeyError):
-            continue
-        text_dict = json.loads(text)
-        try:
-            link = text_dict['serp-item']['preview'][0]['origin']['url']
-            width = text_dict['serp-item']['preview'][0]['origin']['w']
-            height = text_dict['serp-item']['preview'][0]['origin']['h']
-            print(f'width {width}, height {height}')
-            imagelinks.append(link)
-        except(KeyError):
-            continue
-
-    img_count = len(imagelinks)
-    print(f'found {img_count} images')
-    print('Start downloading...')
-
-    errors_count = 0
-    for i, imagelink in tqdm(enumerate(imagelinks),desc= 'Downloaded'):
-        try:
-            #print(imagelink)
-            response = requests.get(imagelink)
-            imagename = SAVE_FOLDER + '/' + data + str(i + 1) + '.jpg'
-            with open(imagename, 'wb') as file:
-                file.write(response.content)
-        except:
-            errors_count +=1
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
-            continue
-    print(f'Downloaded {img_count-errors_count}/{img_count} images')
+    html = get_raw_html_page(request_string, n_images)
+    images_urls = extract_images_urls(html,n_images,max_wh,min_wh)
+    write_images(images_urls, request_string, extension=None)
 
 
 if __name__ == '__main__':

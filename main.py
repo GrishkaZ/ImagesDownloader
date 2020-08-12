@@ -1,14 +1,22 @@
 import json
 import os
 import re
+import sys
+import traceback
+from tqdm import tqdm
 import requests  # to sent GET requests
 from bs4 import BeautifulSoup  # to parse HTML
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import time
 
 
 GOOGLE_IMAGE = \
     'https://www.google.com/search?site=&tbm=isch&source=hp&biw=1873&bih=990&'
 
 YANDEX_IMAGE = 'https://yandex.ru/images/search?text='
+
+CHROME_DRIVER = 'chromedriver.exe'
 
 
 """usr_agent = {
@@ -35,6 +43,52 @@ def main():
     download_images()
 
 
+# Download Page for more than 30 images
+def download_extended_page(url):
+    options = webdriver.ChromeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument("--headless")
+
+    try:
+        browser = webdriver.Chrome(CHROME_DRIVER, chrome_options=options)
+    except Exception as e:
+        print("Looks like Chromedriver does not exist. Perhaps directory is specified not correctly. (exception: %s)" % e)
+        sys.exit()
+    browser.set_window_size(1024, 768)
+
+    # Open the link
+    browser.get(url)
+    time.sleep(1)
+    print("Getting you a lot of images. This may take a few moments...")
+
+    element = browser.find_element_by_tag_name("body")
+    # Scroll down
+    for i in range(30):
+        element.send_keys(Keys.PAGE_DOWN)
+        time.sleep(0.3)
+
+    try:
+        browser.find_element_by_id("smb").click()
+        for i in range(50):
+            element.send_keys(Keys.PAGE_DOWN)
+            time.sleep(0.3)  # bot id protection
+    except:
+        for i in range(10):
+            element.send_keys(Keys.PAGE_DOWN)
+            time.sleep(0.3)  # bot id protection
+
+    print("Reached end of Page.")
+    time.sleep(0.5)
+
+    source = browser.page_source #page source
+    #close the browser
+    browser.close()
+
+    return source
+
+
+
+
 def download_images():
     # ask for user input
     data = input('What are you looking for? ')
@@ -49,13 +103,15 @@ def download_images():
     print('Search URL: ',searchurl)
 
     #response = requests.get(searchurl, headers=usr_agent)
-    response = requests.get(searchurl)
-    html = response.text
+    if n_images >30:
+        html = download_extended_page(searchurl)
+    else:
+        html = requests.get(searchurl).text
 
     soup = BeautifulSoup(html, 'html.parser')
     #print(soup.prettify())
 
-    results = soup.findAll('div', {'class':re.compile('serp-item serp-item_type_search serp-item_group_search serp-item_pos_\d+ serp-item_scale_yes justifier__item i-bem')}, limit=n_images)
+    results = soup.findAll('div',{'class':re.compile('serp-item serp-item_type_search serp-item_group_search serp-item_pos_\d+ serp-item_scale_yes justifier__item i-bem')},limit=n_images)
 
     #'class':"serp-item serp-item_type_search serp-item_group_search serp-item_pos_1 serp-item_scale_yes justifier__item i-bem"
 
@@ -75,15 +131,24 @@ def download_images():
         except(KeyError):
             continue
 
-    print(f'found {len(imagelinks)} images')
+    img_count = len(imagelinks)
+    print(f'found {img_count} images')
     print('Start downloading...')
 
-    for i, imagelink in enumerate(imagelinks):
-        response = requests.get(imagelink)
-        imagename = SAVE_FOLDER + '/' + data + str(i + 1) + '.jpg'
-        with open(imagename, 'wb') as file:
-            file.write(response.content)
-    print('Done')
+    errors_count = 0
+    for i, imagelink in tqdm(enumerate(imagelinks),desc= 'Downloaded'):
+        try:
+            #print(imagelink)
+            response = requests.get(imagelink)
+            imagename = SAVE_FOLDER + '/' + data + str(i + 1) + '.jpg'
+            with open(imagename, 'wb') as file:
+                file.write(response.content)
+        except:
+            errors_count +=1
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
+            continue
+    print(f'Downloaded {img_count-errors_count}/{img_count} images')
 
 
 if __name__ == '__main__':

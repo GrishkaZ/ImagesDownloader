@@ -201,6 +201,9 @@ def download_images():
     print('Start searching...')
     html = get_raw_html_page(request_string, n_images)
     images_urls = extract_images_urls(html,n_images,max_wh,min_wh)
+    with open(SAVE_FOLDER+'/downloaded urls log.txt','a') as file:
+        for url in images_urls:
+            file.write(url+'\n')
     write_images(images_urls, request_string, extension)
 
 

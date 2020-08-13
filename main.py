@@ -40,8 +40,7 @@ EXTENSIONS_LIST = ['png', 'jpg']
 
 
 def main():
-    if not os.path.exists(SAVE_FOLDER):
-        os.mkdir(SAVE_FOLDER)
+
     download_images()
 
 
@@ -189,6 +188,7 @@ def make_file_name_func(extension):
 
 def download_images():
     # ask for user input
+    global SAVE_FOLDER
     request_string = input('What are you looking for? ')
     n_images = int(input('How many images do you want? '))
 
@@ -198,6 +198,22 @@ def download_images():
     min_wh = [10,10]
 
     extension = input(f'Which extension to convert to? {EXTENSIONS_LIST} ').lower()
+
+    while True:
+        save_folder = input('Select the download directory: ')
+        if save_folder:
+            if not os.path.exists(save_folder):
+                try:
+                    os.makedirs(save_folder)
+                except Exception as e:
+                    print(e)
+                    continue
+            SAVE_FOLDER = save_folder
+            break
+        elif not os.path.exists(SAVE_FOLDER):
+            os.makedirs(SAVE_FOLDER)
+            break
+
     print('Start searching...')
     html = get_raw_html_page(request_string, n_images)
     images_urls = extract_images_urls(html,n_images,max_wh,min_wh)

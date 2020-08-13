@@ -9,12 +9,6 @@ from bs4 import BeautifulSoup  # to parse HTML
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
-from enum import Enum
-
-class Extension(Enum):
-    PNG = 'png'
-    JPG = 'jpg'
-
 
 
 GOOGLE_IMAGE = \
@@ -42,6 +36,8 @@ usr_agent = {
 
 
 SAVE_FOLDER = 'images'
+EXTENSIONS_LIST = ['png', 'jpg']
+
 
 def main():
     if not os.path.exists(SAVE_FOLDER):
@@ -93,6 +89,7 @@ def download_extended_page(url):
 
     return source
 
+
 def get_raw_html_page(request_string, n_images, se = 'Yandex'):
 
     # searchurl = GOOGLE_IMAGE + 'q=' + data
@@ -112,12 +109,8 @@ def extract_images_urls(html, n_images, max_wh, min_wh):
     min_h = int(min_wh[1])
     max_w = int(max_wh[0])
     max_h = int(max_wh[1])
-
-
-
     soup = BeautifulSoup(html, 'html.parser')
     # print(soup.prettify())
-
     #find images-tegs
     results = soup.findAll('div',
                            {'class': re.compile(
@@ -130,16 +123,17 @@ def extract_images_urls(html, n_images, max_wh, min_wh):
         try:
             text = teg['data-bem']
         except KeyError as e:
-            print(e)
-            print(teg)
             continue
         text_dict = json.loads(text)
         try:
             images_dict = text_dict['serp-item']['preview']
             for i in range(len(images_dict)):
                 #print(i)
-                width = images_dict[i]['origin']['w']
-                height = images_dict[i]['origin']['h']
+                try:
+                    width = images_dict[i]['origin']['w']
+                    height = images_dict[i]['origin']['h']
+                except KeyError:
+                    continue
                 #print(f'width {width}, height {height}')
                 if (min_w < width) & (width < max_w) & (min_h < height) & (height< max_h):
                     link = images_dict[i]['origin']['url']
@@ -153,10 +147,9 @@ def extract_images_urls(html, n_images, max_wh, min_wh):
                 images_urls.append(link)
                 """
         except KeyError as e:
-            print(e)
-            print(text_dict)
             continue
     return images_urls
+
 
 def write_images(images_urls, img_name, extension = None):
     #func for making file image names
@@ -183,27 +176,33 @@ def write_images(images_urls, img_name, extension = None):
             continue
     print(f'Downloaded {img_count - errors_count}/{img_count} images')
 
+
 def make_file_name_func(extension):
     if extension:
-        if (extension == Extension):
-            raise TypeError('extension must belongs to enum Extension')
-        return lambda *args: args[0] + '.' + extension.value
+        if extension not in EXTENSIONS_LIST:
+            raise TypeError(f'the extension can be equal to value from: {EXTENSIONS_LIST}')
+        return lambda *args: args[0] + '.' + extension
     else:
         #split img url and take it's extension
         return lambda *args: args[0] + '.' + args[1].split('.')[-1]
-
 
 
 def download_images():
     # ask for user input
     request_string = input('What are you looking for? ')
     n_images = int(input('How many images do you want? '))
-    max_wh = input('How max size? (w,h)').split()
-    min_wh = input('How min size? (w,h)').split()
+
+    #max_wh = input('How max size? (w,h)').split()
+    #min_wh = input('How min size? (w,h)').split()
+    max_wh = [10000,10000]
+    min_wh = [10,10]
+
+    extension = input(f'Which extension to convert to? {EXTENSIONS_LIST} ').lower()
     print('Start searching...')
     html = get_raw_html_page(request_string, n_images)
     images_urls = extract_images_urls(html,n_images,max_wh,min_wh)
-    write_images(images_urls, request_string, extension=None)
+    write_images(images_urls, request_string, extension)
+
 
 
 if __name__ == '__main__':

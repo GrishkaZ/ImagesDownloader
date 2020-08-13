@@ -53,8 +53,14 @@ def download_extended_page(url):
     try:
         browser = webdriver.Chrome(options=options)
     except Exception as e:
-        print("Looks like Chromedriver does not exist. Perhaps directory is specified not correctly. (exception: %s)" % e)
-        sys.exit()
+        print(e)
+        print("Looks like Chromedriver does not exist. Perhaps directory is specified not correctly or Chrome Browser is not installed. (Exception: %s)" % e)
+        try:
+            browser = webdriver.Chrome(CHROME_DRIVER,options=options)
+            print('Used integrated Cromedriver')
+        except Exception as e:
+            print('Integrated driver is not found (exception: %s)' % e)
+            sys.exit()
     browser.set_window_size(1024, 768)
 
     # Open the link
@@ -75,7 +81,7 @@ def download_extended_page(url):
             time.sleep(0.3)  # bot id protection
             print('!' * 60)
     except:
-        for i in range(10):
+        for i in range(100):
             element.send_keys(Keys.PAGE_DOWN)
             time.sleep(0.3)  # bot id protection
 
@@ -213,6 +219,7 @@ def download_images():
         elif not os.path.exists(SAVE_FOLDER):
             os.makedirs(SAVE_FOLDER)
             break
+        else: break
 
     print('Start searching...')
     html = get_raw_html_page(request_string, n_images)

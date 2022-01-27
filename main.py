@@ -16,7 +16,7 @@ GOOGLE_IMAGE = \
 
 YANDEX_IMAGE = 'https://yandex.ru/images/search?text='
 
-CHROME_DRIVER = 'chromedriver.exe'
+CHROME_DRIVER = '..\..\chromedriver.exe'
 
 
 """usr_agent = {

@@ -1,1 +1,3 @@
-/venv/Lib/site-packages/QtDesigner/
+/venv
+/.idea
+
